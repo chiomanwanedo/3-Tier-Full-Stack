@@ -1,0 +1,29 @@
+- name: Route traffic to frontend via ingress-nginx
+  hosts: local
+  gather_facts: false
+  vars_files: [ ../group_vars.yml ]
+  collections: [ kubernetes.core ]
+  vars: { ns: webapps }
+  tasks:
+    - name: web ingress
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: web-ingress
+            namespace: "{{ ns }}"
+            annotations:
+              kubernetes.io/ingress.class: nginx
+          spec:
+            rules:
+              - http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: frontend-svc
+                          port: { number: 80 }

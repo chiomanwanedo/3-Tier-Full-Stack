@@ -1,0 +1,10 @@
+# ansible/k8s/group_vars.yml
+kubeconfig: "{{ lookup('env','HOME') }}/.kube/config"
+k8s_namespace: "webapps"
+
+# App settings (we'll update db_host when RDS is ready)
+backend_port: 3000
+db_host: "pending-rds"    # placeholder; we’ll change later
+db_name: "appdb"
+db_user: "appuser"
+db_password: "changeme-Strong1!"

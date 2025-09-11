@@ -1,0 +1,19 @@
+---
+- name: Deploy backend (via Jinja template)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    kubeconfig: "{{ lookup('env','HOME') }}/.kube/config"
+    k8s_namespace: "webapps"
+    backend_port: 3000
+    image: "docker.io/chiomavee/bankapp:latest"
+  collections:
+    - kubernetes.core
+
+  tasks:
+    - name: Apply backend Deployment + Service
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition: "{{ lookup('template', 'templates/backend.yaml.j2') | from_yaml_all | list }}"

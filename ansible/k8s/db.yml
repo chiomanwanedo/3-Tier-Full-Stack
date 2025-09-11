@@ -1,0 +1,57 @@
+- name: Deploy MySQL (StatefulSet + headless svc)
+  hosts: local
+  gather_facts: false
+  vars_files: [ ../group_vars.yml ]
+  collections: [ kubernetes.core ]
+  vars: { ns: webapps }
+  tasks:
+    - name: mysql headless service
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata: { name: mysql-svc, namespace: "{{ ns }}" }
+          spec:
+            clusterIP: None
+            selector: { app: mysql }
+            ports: [ { port: 3306 } ]
+
+    - name: mysql statefulset
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: StatefulSet
+          metadata: { name: mysql, namespace: "{{ ns }}" }
+          spec:
+            serviceName: mysql-svc
+            replicas: 1
+            selector: { matchLabels: { app: mysql } }
+            template:
+              metadata: { labels: { app: mysql } }
+              spec:
+                containers:
+                  - name: mysql
+                    image: mysql:8
+                    ports: [ { containerPort: 3306 } ]
+                    env:
+                      - name: MYSQL_ROOT_PASSWORD
+                        valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_ROOT_PASSWORD } }
+                      - name: MYSQL_DATABASE
+                        valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_DATABASE } }
+                      - name: MYSQL_USER
+                        valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_USER } }
+                      - name: MYSQL_PASSWORD
+                        valueFrom: { secretKeyRef: { name: mysql-secret, key: MYSQL_PASSWORD } }
+                    volumeMounts:
+                      - name: data
+                        mountPath: /var/lib/mysql
+            volumeClaimTemplates:
+              - metadata: { name: data }
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests: { storage: 10Gi }

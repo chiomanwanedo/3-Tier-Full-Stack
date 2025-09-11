@@ -1,0 +1,37 @@
+- name: Install ingress-nginx on AWS (NLB)
+  hosts: local
+  gather_facts: false
+  vars_files: [ ../group_vars.yml ]
+  collections: [ kubernetes.core ]
+  tasks:
+    - name: Ensure namespace exists
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata: { name: ingress-nginx }
+
+    - name: Apply official AWS manifest
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        src: "https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/aws/deploy.yaml"
+
+    - name: Wait for controller pod(s) Ready
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig }}"
+        api_version: v1
+        kind: Pod
+        namespace: ingress-nginx
+        label_selectors: [ "app.kubernetes.io/component=controller" ]
+      register: pods
+      until: >
+        (pods.resources | length) > 0 and
+        (
+          pods.resources | json_query('[].status.containerStatuses[].ready')
+          | select('equalto', true) | list | length
+        ) >= 1
+      retries: 40
+      delay: 10
