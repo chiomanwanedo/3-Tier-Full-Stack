@@ -1,0 +1,73 @@
+- name: Deploy YelpCamp to Kubernetes
+  hosts: local
+  gather_facts: false
+  collections:
+    - kubernetes.core
+  vars:
+    kubeconfig: "{{ lookup('env','KUBECONFIG') }}"
+    ns: "{{ lookup('env','K8S_NAMESPACE') | default('webapps', true) }}"
+    image_repo: "{{ lookup('env','IMAGE_REPO') }}"
+    image_tag: "{{ (lookup('env','IMAGE_TAG') or '')[:7] | default('latest', true) }}"
+    app_name: "yelpcamp"
+
+  tasks:
+    - name: Ensure namespace exists
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata: { name: "{{ ns }}" }
+
+    - name: Apply Service (LoadBalancer)
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        namespace: "{{ ns }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "{{ app_name }}"
+            labels: { app: "{{ app_name }}" }
+          spec:
+            type: LoadBalancer
+            selector: { app: "{{ app_name }}" }
+            ports:
+              - name: http
+                port: 3000
+                targetPort: 3000
+
+    - name: Apply/Update Deployment with fresh image
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        namespace: "{{ ns }}"
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: "{{ app_name }}"
+            labels: { app: "{{ app_name }}" }
+          spec:
+            replicas: 1
+            selector:
+              matchLabels: { app: "{{ app_name }}" }
+            template:
+              metadata:
+                labels: { app: "{{ app_name }}" }
+              spec:
+                # If your Docker Hub repo is PRIVATE, uncomment the next two lines
+                # imagePullSecrets:
+                #   - name: dockerhub-cred
+                containers:
+                  - name: "{{ app_name }}"
+                    image: "{{ image_repo }}:{{ image_tag }}"
+                    imagePullPolicy: IfNotPresent
+                    ports:
+                      - containerPort: 3000
+                    env:
+                      - name: NODE_ENV
+                        value: "production"
+                    # Add your real env/Secrets/ConfigMaps here as needed

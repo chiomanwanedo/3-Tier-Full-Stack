@@ -1,7 +1,45 @@
-version: '3'
+# docker-compose.yml  (Backend + Mongo, no frontend)
 
 services:
-  nodejs:
-    build: .
+  mongo:
+    image: mongo:6.0.13-jammy
+    container_name: yelpcamp_mongo
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      # exit 0 only when ping ok == 1
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand({ ping: 1 }).ok\" | grep -q 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  # Optional UI at http://localhost:8081
+  mongo-express:
+    image: mongo-express:1.0.2-20
+    container_name: yelpcamp_mongo_express
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
     ports:
-      - "3000:3000"
+      - "8081:8081"
+
+  backend:
+    build: ./backend
+    container_name: yelpcamp_backend
+    env_file:
+      - ./backend/.env      # must exist next to this compose file
+    environment:
+      - PORT=3000
+    ports:
+      - "8082:3000"       # open http://localhost:8082
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
