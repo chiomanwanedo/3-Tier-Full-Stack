@@ -1,25 +1,21 @@
-# backend/Dockerfile
-FROM node:18-alpine
+# frontend/Dockerfile
 
-# If you have native deps (bcrypt, sharp, etc.), switch to node:18 and add build tools:
-# RUN apk add --no-cache python3 make g++
-
-# Non-root user (optional but good)
-RUN adduser -D -u 10001 appuser
-
+# --- Build stage ---
+FROM node:20-alpine AS build
 WORKDIR /app
 
-# 1) Copy ONLY dependency manifests first so Docker can cache npm ci layers
 COPY package*.json ./
+RUN npm ci
 
-# 2) Install deps (use lockfile if present)
-RUN npm ci --omit=dev || npm install --omit=dev
-
-# 3) Copy the rest of your app
 COPY . .
+# Optional: allow overriding API at build time (not needed for relative /api)
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+RUN npm run build   # Vite -> dist/ ; if CRA, change to build/
 
-ENV NODE_ENV=production
-USER appuser
-EXPOSE 3000
+# --- Runtime stage ---
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist/ /usr/share/nginx/html/
 
-CMD ["node", "app.js"]
+EXPOSE 80
