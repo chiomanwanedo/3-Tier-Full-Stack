@@ -14,6 +14,7 @@ const flash = require("connect-flash");
 const methodOverride = require("method-override");
 const LocalStrategy = require("passport-local");
 const mongoSanitize = require("express-mongo-sanitize");
+const cors = require("cors");
 
 const ExpressError = require("./utils/ExpressError");
 const User = require("./models/user");
@@ -28,10 +29,10 @@ const apiRoutes = require("./routes/api"); // JSON API
 // If you upgrade to v4+, the API changes to MongoDBStore.create({ mongoUrl, ... }).
 const MongoDBStore = require("connect-mongo")(session);
 
-// Prefer container hostname "mongo" as Docker default, but fix Atlas URLs if they omit the DB name.
+// ------------------------------
+// Database URL (ensure /yelpcamp)
+// ------------------------------
 let dbUrl = process.env.DB_URL || "mongodb://mongo:27017/yelpcamp";
-
-// If the URI has no explicit database segment, append /yelpcamp before any ?query
 try {
   const [base, qs = ""] = dbUrl.split("?");
   const looksLikeMongo = /^mongodb(\+srv)?:\/\//.test(dbUrl);
@@ -39,16 +40,11 @@ try {
   if (looksLikeMongo && !hasDbName) {
     dbUrl = `${base.replace(/\/?$/, "/yelpcamp")}${qs ? `?${qs}` : ""}`;
   }
-} catch (_) {
-  // ignore and use whatever dbUrl already is
-}
+} catch (_) {}
 
-// ✅ Mongoose connection (with a boot-time sanity log)
+// ✅ Mongoose connection + boot check
 mongoose
-  .connect(dbUrl, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(dbUrl, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(async () => {
     console.log("✅ Database connected:", {
       name: mongoose.connection.name,
@@ -70,10 +66,18 @@ mongoose
 
 const app = express();
 
-// --- CORS (TEMP): allow all origins for testing; swap back to allowlist after you confirm
-const cors = require("cors");
-app.use(cors()); // TEMP: allow all origins for testing
-
+// ------------------------------
+// CORS — allow only the Static Site (and optional localhost)
+// ------------------------------
+const allowed = (process.env.FRONTEND_ORIGIN || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+if (allowed.length) {
+  // Example: FRONTEND_ORIGIN="https://your-site.onrender.com,http://localhost:5173"
+  app.use(cors({ origin: allowed, credentials: true }));
+  app.options("*", cors()); // preflight
+}
 
 app.engine("ejs", ejsMate);
 app.set("view engine", "ejs");
@@ -89,8 +93,7 @@ const secret = process.env.SECRET || "thisshouldbeabettersecret!";
 const store = new MongoDBStore({
   url: dbUrl,
   secret,
-  // after 1 day, update the session; otherwise update only when something changes
-  touchAfter: 24 * 60 * 60,
+  touchAfter: 24 * 60 * 60, // update session at most once/day unless data changes
 });
 
 store.on("error", function (e) {
@@ -105,7 +108,7 @@ const sessionConfig = {
   saveUninitialized: true,
   cookie: {
     httpOnly: true,
-    // secure: true, // uncomment when serving over HTTPS
+    // secure: true, // enable if forcing HTTPS only
     expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
     maxAge: 1000 * 60 * 60 * 24 * 7,
   },
@@ -173,7 +176,7 @@ app.use((req, res, next) => {
   res.locals.currentUser = req.user;
   res.locals.success = req.flash("success");
   res.locals.error = req.flash("error");
-  res.locals.mapboxToken = process.env.MAPBOX_TOKEN || ""; // <-- added
+  res.locals.mapboxToken = process.env.MAPBOX_TOKEN || "";
   next();
 });
 
@@ -216,7 +219,6 @@ app.use((err, req, res, next) => {
 });
 
 const port = process.env.PORT || 3000;
-// Bind to all interfaces so it's reachable from the host/container network
 app.listen(port, "0.0.0.0", () => {
   console.log(`Serving on port ${port}`);
 });
