@@ -28,18 +28,6 @@ const apiRoutes = require("./routes/api"); // JSON API
 // If you upgrade to v4+, the API changes to MongoDBStore.create({ mongoUrl, ... }).
 const MongoDBStore = require("connect-mongo")(session);
 
-// --- CORS: allow calls from the deployed Static Site (and optional local dev) ---
-const cors = require("cors");
-const allowed = (process.env.FRONTEND_ORIGIN || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-if (allowed.length) {
-  // Example: FRONTEND_ORIGIN="https://your-site.onrender.com,http://localhost:5173"
-  app?.use?.(cors({ origin: allowed, credentials: true }));
-  app?.options?.("*", cors()); // preflight
-}
-
 // Prefer container hostname "mongo" as Docker default, but fix Atlas URLs if they omit the DB name.
 let dbUrl = process.env.DB_URL || "mongodb://mongo:27017/yelpcamp";
 
@@ -81,6 +69,19 @@ mongoose
   });
 
 const app = express();
+
+// --- CORS: allow calls from the deployed Static Site (and optional local dev)
+const cors = require("cors");
+const allowed = (process.env.FRONTEND_ORIGIN || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+if (allowed.length) {
+  // Example: FRONTEND_ORIGIN="https://your-site.onrender.com,http://localhost:5173"
+  app.use(cors({ origin: allowed, credentials: true }));
+  app.options("*", cors()); // preflight
+}
+
 
 app.engine("ejs", ejsMate);
 app.set("view engine", "ejs");
