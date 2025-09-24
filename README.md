@@ -1,3 +1,6 @@
+[![Backend CI & Deploy (Render)](https://github.com/chiomanwanedo/3-Tier-Full-Stack/actions/workflows/backend-ci-deploy.yml/badge.svg)](https://github.com/chiomanwanedo/3-Tier-Full-Stack/actions/workflows/backend-ci-deploy.yml)
+
+
 # Yelp Camp Web Application
 
 This web application allows users to add, view, access, and rate campgrounds by location. It is based on "The Web Developer Bootcamp" by Colt Steele, but includes several modifications and bug fixes. The application leverages a variety of technologies and packages, such as:
