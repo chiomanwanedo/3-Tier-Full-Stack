@@ -32,16 +32,41 @@ const MongoDBStore = require("connect-mongo")(session);
 // const cors = require("cors");
 // app.use(cors({ origin: "http://localhost:8082", credentials: true }));
 
-// Prefer container hostname "mongo" as Docker default
-const dbUrl = process.env.DB_URL || "mongodb://mongo:27017/yelpcamp";
+// Prefer container hostname "mongo" as Docker default, but fix Atlas URLs if they omit the DB name.
+let dbUrl = process.env.DB_URL || "mongodb://mongo:27017/yelpcamp";
 
-// ✅ Mongoose connection
+// If the URI has no explicit database segment, append /yelpcamp before any ?query
+try {
+  const [base, qs = ""] = dbUrl.split("?");
+  const looksLikeMongo = /^mongodb(\+srv)?:\/\//.test(dbUrl);
+  const hasDbName = /\/[^/?]+$/.test(base); // ends with /dbname
+  if (looksLikeMongo && !hasDbName) {
+    dbUrl = `${base.replace(/\/?$/, "/yelpcamp")}${qs ? `?${qs}` : ""}`;
+  }
+} catch (_) {
+  // ignore and use whatever dbUrl already is
+}
+
+// ✅ Mongoose connection (with a boot-time sanity log)
 mongoose
   .connect(dbUrl, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("✅ Database connected"))
+  .then(async () => {
+    console.log("✅ Database connected:", {
+      name: mongoose.connection.name,
+      host: mongoose.connection.host,
+    });
+    try {
+      const n = await mongoose.connection.db
+        .collection("campgrounds")
+        .countDocuments();
+      console.log("[BootCheck] campgrounds =", n);
+    } catch (e) {
+      console.error("[BootCheck] count failed:", e.message);
+    }
+  })
   .catch((err) => {
     console.error("❌ Database connection error:", err);
     process.exit(1);
