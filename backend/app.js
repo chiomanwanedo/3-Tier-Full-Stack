@@ -70,17 +70,9 @@ mongoose
 
 const app = express();
 
-// --- CORS: allow calls from the deployed Static Site (and optional local dev)
+// --- CORS (TEMP): allow all origins for testing; swap back to allowlist after you confirm
 const cors = require("cors");
-const allowed = (process.env.FRONTEND_ORIGIN || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-if (allowed.length) {
-  // Example: FRONTEND_ORIGIN="https://your-site.onrender.com,http://localhost:5173"
-  app.use(cors({ origin: allowed, credentials: true }));
-  app.options("*", cors()); // preflight
-}
+app.use(cors()); // TEMP: allow all origins for testing
 
 
 app.engine("ejs", ejsMate);
