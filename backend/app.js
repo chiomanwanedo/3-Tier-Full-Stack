@@ -16,7 +16,7 @@ const flash = require("connect-flash");
 const methodOverride = require("method-override");
 const LocalStrategy = require("passport-local");
 const mongoSanitize = require("express-mongo-sanitize");
-const logger = require("./lib/logger"); // <-- Pino logger (to Loki if creds set)
+const logger = require('./logger'); // <-- Pino logger (to Loki if creds set)
 
 // App/DB utils
 const ExpressError = require("./utils/ExpressError");
